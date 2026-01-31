@@ -1,5 +1,13 @@
 #!/bin/bash
 
+# Version
+VERSION="1.0"
+
+if [[ "$1" == "-v" || "$1" == "--version" ]]; then  
+    echo -e "EzWoL version $VERSION"
+    exit 0
+fi
+
 # Configuration du stockage
 CONFIG_DIR="$HOME/.wol-manager"
 CONFIG_FILE="$CONFIG_DIR/devices.conf"
@@ -13,14 +21,41 @@ PURPLE='\033[0;35m'
 NC='\033[0m'
 
 # Initialisation
-if [[ ! -d "$CONFIG_DIR" ]]; then 
+if [[ ! -d "$CONFIG_DIR" ]]; then
+    clear
     mkdir -p "$CONFIG_DIR"
-    echo -e "${CYAN}Initialisation : Dossier de config créé dans $CONFIG_DIR${NC}"
+    touch "$CONFIG_FILE"
+    
+    
+    echo -e "${PURPLE}"
+    center_text " _____     _ _ _       _ "
+    center_text "|   __|___| | | | ___ | |"
+    center_text "|   __|- _| | | |  _  | |"
+    center_text "|_____|___|_____|___|_|_|"
+    echo -e "${NC}"
+    center_text "Bienvenue dans EzWoL !"
+    center_text "Configuration initiale en cours..."
+    sleep 1.5
+    center_text "${GREEN}Dossier de configuration créé : $CONFIG_DIR${NC}"
+    sleep 2
 fi
 
-if [[ ! -f "$CONFIG_FILE" ]]; then 
-    touch "$CONFIG_FILE"
-fi
+# Validations
+validate_ip(){
+    if [[ $1 =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+        return 0
+    else 
+        return 1
+    fi
+}
+
+validate_mac(){
+    if [[ $1 =~ ^([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2}$ ]]; then
+        return 0
+    else 
+        return 1
+    fi
+}
 
 # Verification wakeonlan
 if ! command -v wakeonlan &> /dev/null; then 
@@ -48,86 +83,175 @@ fi
 
 # Supprimer un appareil
 delete_device(){
-    clear
-    clear
-    echo -e "${PURPLE}------------------------------------------${NC}"
-    echo -e "${RED}        [ SUPPRIMER UN APPAREIL ]${NC}"
-    echo -e "${PURPLE}------------------------------------------${NC}"
+    while true; do
+        draw_header
+        center_text "─── SUPPRIMER UN APPAREIL ───"
+        echo -e "\n"
 
-    if [[ ! -s "$CONFIG_FILE" ]]; then 
-        echo "La liste est vide." ; sleep 1 ; return
-    fi
-    
-    mapfile -t lines < "$CONFIG_FILE"
-    for i in "${!lines[@]}"; do 
-        IFS=: read -r name ip bc mac <<< "${lines[$i]}"
-        echo -e "$((i+1))) $name"
+        if [[ ! -s "$CONFIG_FILE" ]]; then 
+            center_text "${RED}La liste est vide.${NC}"
+            sleep 1 ; return
+        fi
+        
+        mapfile -t lines < "$CONFIG_FILE"
+        for i in "${!lines[@]}"; do 
+            IFS=: read -r name ip bc mac <<< "${lines[$i]}"
+            center_text "$((i+1))) ${GREEN}$name${NC} ($mac)"
+        done
+
+        echo -e "\n"
+        center_text "q) Annuler et retourner au menu"
+        echo -e "${PURPLE}$(printf '━%.0s' $(seq 1 $(tput cols)))${NC}"
+
+        read -p "Numéro à supprimer : " del_choice
+
+        if [[ "$del_choice" == "q" ]]; then return; fi
+
+        if [[ "$del_choice" =~ ^[0-9]+$ ]] && [ "$del_choice" -le "${#lines[@]}" ] && [ "$del_choice" -gt 0 ]; then
+            
+            IFS=: read -r name ip bc mac <<< "${lines[$((del_choice-1))]}"
+            
+            sed -i "${del_choice}d" "$CONFIG_FILE"
+            echo -e "\n$(center_text "${RED}Appareil '$name' supprimé.${NC}")"
+            sleep 1 ; break
+        else
+            echo -e "$(center_text "${YELLOW}Choix invalide.${NC}")"
+            sleep 1
+        fi
     done
-    echo "q) Annuler"
-
-    read -p "Numéro à supprimer : " del_choice
-    if [[ "$del_choice" =~ ^[0-9]+$ ]] && [ "$del_choice" -le "${#lines[@]}" ]; then
-        sed -i "${del_choice}d" "$CONFIG_FILE"
-        echo -e "${GREEN}Appareil supprimé !${NC}"
-        sleep 1
-    fi
 }
 # Ajout d'un appareil
 add_device(){
-    echo -e "\n${YELLOW}[ Ajouter un Appareil ]${NC}"
-    read -p "Nom (ex: Windows1, Linux2, Mac3) : " name
-    read -p "IP (ex: 192.168.1.50) : " ip
-    read -p "Broadcast ? (y/n) : " bc_choice
-    [[ "$bc_choice" == "y" ]] && broadcast="yes" || broadcast="no"
-    read -p "Adresse MAC (ex: AA:BB:CC:DD:EE:FF) : " mac
+    local name="" ip="" bc="" mac="" err=""
+    local err=""
+
+    while true; do
+        draw_header
+        center_text "─── AJOUTER UN APPAREIL ───"
+
+        if [[ -n "$err" ]]; then
+            echo -e "\n$(center_text "${RED}$err${NC}")"
+        fi
+        echo -e "\n"
+
+        if [[ -z "$name" ]]; then
+                read -p "  Nom de la machine : " input
+                if [[ -z "$input" ]]; then err="Le nom ne peut pas être vide."
+                elif grep -q "^$input:" "$CONFIG_FILE"; then err="Ce nom existe déjà."
+                else name="$input"; err=""; fi
+    
+        elif [[ -z "$ip" ]]; then
+                echo -e "  Nom : ${GREEN}$name${NC}"
+                read -p "  Adresse IP (ex: 192.168.1.50) : " input
+                if validate_ip "$input"; then ip="$input"; err=""
+                else err="Format IP invalide."; fi
+
+        elif [[ -z "$bc" ]]; then
+                echo -e "  Nom : ${GREEN}$name${NC} | IP : ${GREEN}$ip${NC}"
+                read -p "  Option Broadcast ? (y/n) : " input
+                if [[ "$input" == "y" || "$input" == "n" ]]; then
+                    [[ "$input" == "y" ]] && bc="yes" || bc="no"; err=""
+                else err="Veuillez répondre par 'y' ou 'n'."; fi
+        
+        elif [[ -z "$mac" ]]; then
+                echo -e "  Nom : ${GREEN}$name${NC} | IP : ${GREEN}$ip${NC} | BC : ${GREEN}$bc${NC}"
+                read -p "  Adresse MAC (ex: AA:BB:CC:DD:EE:FF) : " input
+                if validate_mac "$input"; then mac="$input"; err=""; break
+                else err="Format MAC invalide."; fi
+            fi
+    done
 
     echo "$name:$ip:$broadcast:$mac" >> "$CONFIG_FILE"
-    echo -e "${GREEN}Appareil enregistré !${NC}"
-    sleep 1
+    echo -e "${GREEN}Appareil '$name' enregistré !${NC}"
+    sleep 2
 }
 
 # Liste des appareils
 load_devices(){
-    clear
-    echo -e "${CYAN} == LISTE DES APPAREILS ==${NC}"
+    while true; do
+        draw_header
+        center_text "─── RÉVEILLER UN APPAREIL ───"
+        echo -e "\n"
 
-    if [[ ! -s "$CONFIG_FILE" ]]; then 
-        echo -e "${RED}La liste est vide.${NC}"
-        echo -e "Utilisez la deuxieme option pour ajouter un PC."
-        read -p "Appuyez sur Entrée..."
-        return
-    fi
-
-    mapfile -t lines < "$CONFIG_FILE"
-    for i in "${!lines[@]}"; do 
-        IFS=: read -r name ip bc mac <<< "${lines[$i]}"
-        echo -e "$((i+1)) ${GREEN}$name${NC} | $mac | IP: $ip"
-    done
-    echo -e "q) Retour"
-
-    read -p "Action : " choice
-    if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -le "${#lines[@]}" ]; then
-        IFS=: read -r name ip bc mac <<< "${lines[$((choice-1))]}"
-        echo -e "${YELLOW}Réveil de $name ... ${NC}"
-
-        if [[ "$bc" == "yes" ]]; then 
-            wakeonlan "$mac"
-        else 
-            wakeonlan -i "$ip" "$mac"
+        if [[ ! -s "$CONFIG_FILE" ]]; then 
+            center_text "${RED}La liste est vide.${NC}"
+            center_text "Ajoutez un PC via le menu principal."
+            read -p "  Appuyez sur Entrée..." ; return
         fi
-        read -p "Appuyez sur Entrée pour continuer..."
-    fi
+
+        # Lecture et affichage des appareils
+        mapfile -t lines < "$CONFIG_FILE"
+        for i in "${!lines[@]}"; do 
+            IFS=: read -r name ip bc mac <<< "${lines[$i]}"
+            echo -e "$(center_text "$((i+1))) ${GREEN}$name${NC} | IP: $ip | MAC: $mac")"
+        done
+        
+        echo -e "\n"
+        center_text "q) Retour au menu"
+        echo -e "${PURPLE}$(printf '━%.0s' $(seq 1 $(tput cols)))${NC}"
+        
+        read -p "  Action (Numéro du PC) : " choice
+
+        if [[ "$choice" == "q" ]]; then return; fi
+
+        if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -le "${#lines[@]}" ] && [ "$choice" -gt 0 ]; then
+            IFS=: read -r name ip bc mac <<< "${lines[$((choice-1))]}"
+            clear
+            draw_header
+            echo -e "\n"
+            center_text "${YELLOW}⚡ Tentative de réveil de : $name${NC}"
+            
+            if [[ "$bc" == "yes" ]]; then 
+                base_ip=$(echo $ip | cut -d. -f1-3)
+                target_ip="${base_ip}.255"
+                center_text "Diffusion Broadcast sur : $target_ip"
+                wakeonlan -i "$target_ip" "$mac"
+            else 
+                center_text "Envoi direct sur : $ip"
+                wakeonlan -i "$ip" "$mac"
+            fi
+            
+            echo -e "\n"
+            center_text "${GREEN} Magic Packet envoyé !${NC}"
+            read -p "  Appuyez sur Entrée pour continuer..."
+            break
+        else
+            center_text "${RED}Choix invalide.${NC}"
+            sleep 1
+        fi
+    done
+}
+
+center_text() {
+    local text="$1"
+    local width=$(tput cols)
+    local clean_text=$(echo -e "$text" | sed 's/\x1b\[[0-9;]*m//g')
+    local padding=$(( (width - ${#clean_text}) / 2 ))
+    [[ $padding -lt 0 ]] && padding=0
+    printf "%${padding}s" " "
+    echo -e "$text"
+}
+
+draw_header() {
+    clear
+    echo -e "${PURPLE}"
+    center_text " _____     _ _ _       _ "
+    center_text "|   __|___| | | | ___ | |"
+    center_text "|   __|- _| | | |  _  | |"
+    center_text "|_____|___|_____|___|_|_|"
+    echo -e "${NC}"
+    center_text "v$VERSION - Made by Aruuuux"
+    echo -e "${PURPLE}$(printf '━%.0s' $(seq 1 $(tput cols)))${NC}"
 }
 
 while true; do
-    clear
-    echo -e "${PURPLE} ---------------------------- "
-    echo -e "     EZWOL MANAGER     "
-    echo -e "---------------------------- ${NC}"
+    draw_header
+    echo -e "\n"
     echo " 1) Liste des appareils enregistrés"
     echo " 2) Ajouter un appareil"
     echo " 3) Supprimer un appareil"
     echo " 4) Quitter"
+    echo -e "\n"
     read -p "Choix : " main_choice
 
     case $main_choice in
