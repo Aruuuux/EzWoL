@@ -14,4 +14,4 @@ if [[ "$clear_data" == "y" ]]; then
     echo -e "${RED}[-] Configuration folder deleted ${NC}"
 fi
 
-echo -e "\n${YELLOW}Uninstall complete. Please run: source ~/.bashrc${NC}"
+echo -e "\n${YELLOW}Uninstall complete. Please run: 'source ~/.bashrc'${NC}"

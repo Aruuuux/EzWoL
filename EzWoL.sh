@@ -1,15 +1,9 @@
 #!/bin/bash
 
 # --- VERSION & CONFIG ---
-VERSION="2.1"
+VERSION="2.2"
 CONFIG_DIR="$HOME/.EzWoL"
 CONFIG_FILE="$CONFIG_DIR/devices.conf"
-
-# --- VERSION ARGUMENT CHECK ---
-if [[ "$1" == "-v" || "$1" == "--version" ]]; then  
-    echo -e "EzWoL version $VERSION"
-    exit 0
-fi
 
 # --- COLORS ---
 GREEN='\033[0;32m'
@@ -17,6 +11,40 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 PURPLE='\033[0;35m'
 NC='\033[0m'
+
+# --- ARGUMENT HANDLING ---
+case "$1" in
+    -v | --version)
+        echo -e "EzWoL version $VERSION"
+        exit 0
+        ;;
+
+    -h |--help)
+        echo -e "${PURPLE}EzWoL Help Menu${NC}"
+        echo -e "Usage: ezwol [option]"
+        echo -e ""
+        echo -e "Options:"
+        echo -e "  (none)         Launch the interactive menu"
+        echo -e "  -v, --version  Show current version"
+        echo -e "  -h, --help     Show this help message"
+        echo -e "  --uninstall    Remove the alias and configuration"
+        exit 0
+        ;;
+
+    --uninstall)
+        echo -e "${RED}Starting Uninstallation...${NC}"
+        sed -i '/alias ezwol=/d' ~/.bashrc
+        unalias ezwol 2>/dev/null
+
+        read -p "Delete saved devices in $CONFIG_DIR? (y/n): " clear_data
+        [[ "$clear_data" == "y" ]] && rm -rf "$CONFIG_DIR"
+
+        echo -e "${YELLOW}Uninstall complete. Please run 'source ~/.bashrc' to finish.${NC}"
+        exit 0
+        ;;
+esac
+
+
 
 # --- UI FUNCTIONS ---
 center_text() {
@@ -240,8 +268,6 @@ load_devices(){
         fi
     done
 }
-
-
 
 # --- MAIN MENU ---
 while true; do

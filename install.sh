@@ -19,4 +19,4 @@ else
     echo -e "${RED}[!] Alias 'ezwol' already exist ${NC}"
 fi
 
-echo -e "${YELLOW} Please run : source ~/.bashrc to use 'ezwol' immediately.${NC}"
+echo -e "${YELLOW} Please run : 'source ~/.bashrc' to use EzWoL immediately.${NC}"
