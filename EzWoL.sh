@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # --- VERSION & CONFIG ---
-VERSION="2.0"
-CONFIG_DIR="$HOME/.wol-manager"
+VERSION="2.1"
+CONFIG_DIR="$HOME/.EzWoL"
 CONFIG_FILE="$CONFIG_DIR/devices.conf"
 
 # --- VERSION ARGUMENT CHECK ---
